@@ -1,0 +1,1 @@
+KERNEL=="video*", ATTR{index}=="0", ATTRS{idVendor}=="1bcf", ATTRS{idProduct}=="0b15", MODE:="0777", SYMLINK+="camera_0"
