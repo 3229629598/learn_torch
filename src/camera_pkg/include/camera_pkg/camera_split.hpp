@@ -1,3 +1,6 @@
+#ifndef camera_split_hpp
+#define camera_split_hpp
+
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/u_int8.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -24,3 +27,5 @@ namespace camera_split_ns
         void img_split(cv::Mat img);
     };
 }
+
+#endif
