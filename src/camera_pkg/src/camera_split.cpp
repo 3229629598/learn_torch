@@ -2,12 +2,59 @@
 
 namespace camera_split_ns
 {
-    Camera_Split::Camera_Split():Node("camera_split_node")
+    Camera_Split::Camera_Split():Node("image_cali_node"),it_(std::shared_ptr<rclcpp::Node>(std::move(this)))
     {
-        RCLCPP_INFO(get_logger(),"Camera_split_node is running.");
-        img_raw_sub=this->create_subscription<sensor_msgs::msg::Image>("/usb_cam/image_raw", 1, std::bind(&Camera_Split::img_raw_callback, this, std::placeholders::_1));
-        left_img_raw_pub=this->create_publisher<sensor_msgs::msg::Image>("/left_cam/image_raw",1);
-        right_img_raw_pub=this->create_publisher<sensor_msgs::msg::Image>("/right_cam/image_raw",1);
+        RCLCPP_INFO(get_logger(),"Image_cali_node is running.");
+        img_raw_sub=this->create_subscription<sensor_msgs::msg::Image>("/usb_cam/image_raw", 1, std::bind(&Camera_Split::img_raw_callback, this, _1));
+        left_img_real_pub=it_.advertiseCamera("/left_cam/image_raw", 1);
+        right_img_real_pub=it_.advertiseCamera("/right_cam/image_raw", 1);
+
+        std::string left_cam_info,right_cam_info;
+        this->declare_parameter("left_cam_info", "");
+        this->declare_parameter("right_cam_info", "");
+        this->get_parameter("left_cam_info",left_cam_info);
+        this->get_parameter("right_cam_info",right_cam_info);
+
+        if(!left_cam_info.empty())
+        {
+            if(cim_prt->validateURL(left_cam_info))
+            {
+                RCLCPP_INFO(get_logger(),"Load left_cam_info.");
+                cim_prt->loadCameraInfo(left_cam_info);
+                ci_left_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo(cim_prt->getCameraInfo()));
+            }
+            else
+            {
+                RCLCPP_ERROR(get_logger(),"Failed to load left_cam_info.");
+                rclcpp::shutdown();
+            }
+        }
+        else
+        {
+            RCLCPP_WARN(get_logger(),"Not found left_cam_info.");
+            ci_left_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo());
+        }
+
+        if(!right_cam_info.empty())
+        {
+            if(cim_prt->validateURL(right_cam_info))
+            {
+                RCLCPP_INFO(get_logger(),"Load right_cam_info.");
+                cim_prt->loadCameraInfo(right_cam_info);
+                ci_right_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo(cim_prt->getCameraInfo()));
+            }
+            else
+            {
+                RCLCPP_ERROR(get_logger(),"Failed to load right_cam_info.");
+                rclcpp::shutdown();
+            }
+        }
+        else
+        {
+            RCLCPP_WARN(get_logger(),"Not found right_cam_info.");
+            ci_right_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo());
+        }
+
     }
 
     Camera_Split::~Camera_Split()
@@ -15,27 +62,22 @@ namespace camera_split_ns
 
     void Camera_Split::img_raw_callback(const sensor_msgs::msg::Image::SharedPtr img_raw_buf)
     {
-        try
-        {
-            cv_ptr=cv_bridge::toCvCopy(img_raw_buf, sensor_msgs::image_encodings::BGR8); //将ROS消息中的图象信息提取，生成新cv类型的图象，复制给CvImage指针
-            img_split(cv_ptr->image);
-        }
-        catch(cv_bridge::Exception& e)
-        {
-            RCLCPP_ERROR(get_logger(),"cv_bridge exception: %s", e.what());
-            return;
-        } 
-    }
+        cv_bridge::CvImageConstPtr cv_ptr;
+        cv_ptr=cv_bridge::toCvShare(img_raw_buf,sensor_msgs::image_encodings::BGR8);
 
-    void Camera_Split::img_split(cv::Mat img)
-    {
-        cv::Mat split_mat=img(cv::Range(0,img.rows),cv::Range(0,img.cols/2));
-        split_img_buf=cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", split_mat).toImageMsg();
-        left_img_raw_pub->publish(*split_img_buf);
+        cv::Mat mat_buf=cv_ptr->image(cv::Rect(0, 0, cv_ptr->image.cols/2, cv_ptr->image.rows));
+        cv_left_ptr=cv_bridge::CvImagePtr(new cv_bridge::CvImage(cv_ptr->header,cv_ptr->encoding,mat_buf));
+        mat_buf=cv_ptr->image(cv::Rect(cv_ptr->image.cols/2, 0, cv_ptr->image.cols/2, cv_ptr->image.rows));
+        cv_right_ptr=cv_bridge::CvImagePtr(new cv_bridge::CvImage(cv_ptr->header,cv_ptr->encoding,mat_buf));
 
-        split_mat=img(cv::Range(0,img.rows),cv::Range(img.cols/2,img.cols));
-        split_img_buf=cv_bridge::CvImage(std_msgs::msg::Header(), "bgr8", split_mat).toImageMsg();
-        right_img_raw_pub->publish(*split_img_buf);
+        ci_left_ptr->header=cv_ptr->header;
+        ci_right_ptr->header=cv_ptr->header;
+        sensor_msgs::msg::Image::SharedPtr img_left_ptr=cv_left_ptr->toImageMsg();
+        sensor_msgs::msg::Image::SharedPtr img_right_ptr=cv_right_ptr->toImageMsg();
+        img_left_ptr->header=img_raw_buf->header;
+        img_right_ptr->header=img_raw_buf->header;
+        left_img_real_pub.publish(img_left_ptr,ci_left_ptr);
+        right_img_real_pub.publish(img_right_ptr,ci_right_ptr);
     }
 
 }
