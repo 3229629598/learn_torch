@@ -10,6 +10,7 @@
 #include <camera_info_manager/camera_info_manager.hpp>
 #include <opencv2/opencv.hpp>
 #include <boost/shared_ptr.hpp>
+#include <ament_index_cpp/get_package_share_directory.hpp>
 
 namespace camera_split_ns
 {
@@ -27,7 +28,7 @@ namespace camera_split_ns
         image_transport::CameraPublisher left_img_real_pub,right_img_real_pub;
         cv_bridge::CvImagePtr cv_left_ptr,cv_right_ptr;
         sensor_msgs::msg::CameraInfo::SharedPtr ci_left_ptr,ci_right_ptr;
-        boost::shared_ptr<camera_info_manager::CameraInfoManager> cim_prt;
+        boost::shared_ptr<camera_info_manager::CameraInfoManager> cim_left_ptr,cim_right_ptr;
     };
 }
 

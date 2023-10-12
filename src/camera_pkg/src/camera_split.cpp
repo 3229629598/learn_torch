@@ -2,12 +2,14 @@
 
 namespace camera_split_ns
 {
-    Camera_Split::Camera_Split():Node("image_cali_node"),it_(std::shared_ptr<rclcpp::Node>(std::move(this)))
+    Camera_Split::Camera_Split():Node("camera_split_node"),it_(std::shared_ptr<rclcpp::Node>(std::move(this)))
     {
-        RCLCPP_INFO(get_logger(),"Image_cali_node is running.");
+        RCLCPP_INFO(get_logger(),"Camera_split_node is running.");
         img_raw_sub=this->create_subscription<sensor_msgs::msg::Image>("/usb_cam/image_raw", 1, std::bind(&Camera_Split::img_raw_callback, this, _1));
         left_img_real_pub=it_.advertiseCamera("/left_cam/image_raw", 1);
         right_img_real_pub=it_.advertiseCamera("/right_cam/image_raw", 1);
+
+        std::string pkg_share = ament_index_cpp::get_package_share_directory("camera_pkg");
 
         std::string left_cam_info,right_cam_info;
         this->declare_parameter("left_cam_info", "");
@@ -17,16 +19,16 @@ namespace camera_split_ns
 
         if(!left_cam_info.empty())
         {
-            if(cim_prt->validateURL(left_cam_info))
+            try
             {
-                RCLCPP_INFO(get_logger(),"Load left_cam_info.");
-                cim_prt->loadCameraInfo(left_cam_info);
-                ci_left_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo(cim_prt->getCameraInfo()));
+                cim_left_ptr.reset(new camera_info_manager::CameraInfoManager(this,"left_cam","file://" + pkg_share + left_cam_info));
+                RCLCPP_INFO(get_logger(),"Load left_cam_info.");  
+                ci_left_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo(cim_left_ptr->getCameraInfo()));
             }
-            else
+            catch(std::exception e)
             {
                 RCLCPP_ERROR(get_logger(),"Failed to load left_cam_info.");
-                rclcpp::shutdown();
+                ci_left_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo());
             }
         }
         else
@@ -37,16 +39,17 @@ namespace camera_split_ns
 
         if(!right_cam_info.empty())
         {
-            if(cim_prt->validateURL(right_cam_info))
+            // right_cam_info="file://" + pkg_share + left_cam_info;
+            try
             {
+                cim_right_ptr.reset(new camera_info_manager::CameraInfoManager(this,"right_cam","file://" + pkg_share + right_cam_info));
                 RCLCPP_INFO(get_logger(),"Load right_cam_info.");
-                cim_prt->loadCameraInfo(right_cam_info);
-                ci_right_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo(cim_prt->getCameraInfo()));
+                ci_right_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo(cim_right_ptr->getCameraInfo()));
             }
-            else
+            catch(std::exception e)
             {
                 RCLCPP_ERROR(get_logger(),"Failed to load right_cam_info.");
-                rclcpp::shutdown();
+                ci_right_ptr=sensor_msgs::msg::CameraInfo::SharedPtr(new sensor_msgs::msg::CameraInfo());
             }
         }
         else
