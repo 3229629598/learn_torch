@@ -39,7 +39,6 @@ namespace camera_split_ns
 
         if(!right_cam_info.empty())
         {
-            // right_cam_info="file://" + pkg_share + left_cam_info;
             try
             {
                 cim_right_ptr.reset(new camera_info_manager::CameraInfoManager(this,"right_cam","file://" + pkg_share + right_cam_info));
