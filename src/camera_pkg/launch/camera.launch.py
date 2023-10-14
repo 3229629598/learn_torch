@@ -7,7 +7,6 @@ from launch_ros.actions import Node
 from launch.conditions import IfCondition
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from ament_index_python.packages import get_package_share_directory
 
 
 ld = LaunchDescription()
@@ -42,9 +41,16 @@ img_proc_launch=IncludeLaunchDescription(
     condition=IfCondition(use_rectify)
 )
 
+yolo_launch=IncludeLaunchDescription(
+    PythonLaunchDescriptionSource(
+        os.path.join(get_package_share_directory("yolov5_ros2"),"launch","yolov5_ros2.launch.py")
+    )
+)
+
 ld.add_action(usb_cam_node)
 ld.add_action(camera_split_node)
 ld.add_action(img_proc_launch)
+ld.add_action(yolo_launch)
 
 def generate_launch_description():
     return ld
